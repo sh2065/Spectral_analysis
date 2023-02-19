@@ -26,7 +26,7 @@ from scipy.signal import find_peaks
 class DF_analysis:
 
     def __init__(self, file_path=None):
-        self.z_scan_name = 'dark_field_spec_0'
+        self.z_scan_name = 'z_scan_0'
         self.img_name = 'CWL.thumb_image_0'
         self.scan_range = [0,1000]
         self.particle_range = [0, np.inf]
@@ -81,7 +81,7 @@ class DF_analysis:
                                 if c_c == True:
                                     spe=data[l][self.z_scan_name]
                                     container.append(np.max(spe,axis=0))
-                                    if self.Wav is not []:
+                                    if self.Wav == []:
                                         Wav=np.array(spe.attrs['wavelengths']).astype(np.float64)
                                         Ref=np.array(spe.attrs['reference']).astype(np.float64)
                                         Bgd=np.array(spe.attrs['background']).astype(np.float64)
