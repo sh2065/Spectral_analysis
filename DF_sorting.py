@@ -41,14 +41,14 @@ class DF_analysis:
         self.threshold=10
         self.peak_cut=[600, np.inf]
         self.bgd_remove=False
+        self.bgd_remove_order=1
         self.Normal_NPoM=True
-        self.Normal_data=False
+        self.Normal_data=True
         self.Wav=[]
         self.ref=[]
         self.bgd=[]
 
     def Load_data(self):
-
         if self.file_path is None:
             try:
                 File_path=np.loadtxt('File_path.txt',delimiter=',', dtype=np.str)
@@ -61,7 +61,6 @@ class DF_analysis:
             self.data_name = File_path[1]
         else:
             File_path=[self.file_path]
-
         with h5py.File(File_path[0],'r') as File:
             container=[]
             name=[]
@@ -162,8 +161,8 @@ class DF_analysis:
             print('Radius is:' +str(radius))
         return result
 
-    def Analyse(self, save_data=True, order=1, normalize= False):
-        
+    def Analyse(self, save_data=True, normalize= False):
+
         Wav, Spe, res_0 = self.Load_data()
         name = res_0['Particle name']
         Pos_max=[]
@@ -229,7 +228,7 @@ class DF_analysis:
         np.savetxt(self.data_name+'_Useful_para.txt',['Total_spe_num: ' + str(len(Spe)), 'Normal_spe_num: ' + str(len(Spe_succ)), 'Weird_spe_num: ' + str(len(Fail_spe))],fmt='%s')
         
         print('Plotting figures...')
-        res_2 = self.plot_hist_spe(Wav, Spe_succ, Pos_max, save_data, self.bgd_remove, order, normalize)
+        res_2 = self.plot_hist_spe(Wav, Spe_succ, Pos_max, save_data, self.bgd_remove, self.bgd_remove_order, normalize)
 
         res_1 = {'Wavelengths': Wav,'Fail spectra': Fail_spe, 'Fail name': Fail_name, 'Succ name': Succ_name, 'Succ spectra': Spe_succ}
 

@@ -16,6 +16,26 @@ from nplab.analysis.background_removal import Adaptive_Polynomial as AP
 from tqdm import tqdm
 from lmfit.models import GaussianModel, LorentzianModel
 from Shu_analysis import Fitting_functions as Ff
+from scipy.signal import butter, filtfilt
+from scipy.signal import savgol_filter as sgFilt
+
+def UV_vis(File_path, data_path, input_bgd_ref =False, bgd_input= None, ref_input=None,plot=False):
+    
+    with h5py.File(File_path,'r') as File:
+        spe=np.asarray(File[data_path])
+        Wav = np.asarray(File[data_path].attrs['wavelengths'])
+        bgd=np.asarray(File[data_path].attrs['background'])
+        ref=np.asarray(File[data_path].attrs['reference'])
+
+    if input_bgd_ref:
+        bgd = bgd_input
+        ref = ref_input
+    A=np.log10((ref-bgd)/(abs(spe-bgd)))
+    if plot:
+        pf.plt_plot(Wav, A,linewidth=2)
+
+    return Wav, A
+
 
 def sort_h5py_bug(File_path):
     with h5py.File(File_path,'r+') as File:
@@ -72,18 +92,27 @@ def SERS_spe_sorting(File_path, scan=[0], group_len=2, data_name='kinetic_SERS',
                     Int_all.append(np.max(spe_0))
     return Wav, spe_all , Int_all
 
-def DF_spe_sorting(File,data_path, x_lim=[480,950]):
-    data=np.asarray(File[data_path])
-    if len( data.shape) == 2:
+def DF_spe_sorting(File_path,data_path, x_lim=[480,950], z_scan=True):
+    
+    with h5py.File(File_path, 'r') as File:
+        data=np.asarray(File[data_path])
+        bgd=File[data_path].attrs['background']
+        ref=File[data_path].attrs['reference']
+        Wav=File[data_path].attrs['wavelengths']
+    if len( data.shape) == 2 and z_scan:
         data=np.max(data,axis=0)
-    bgd=File[data_path].attrs['background']
-    ref=File[data_path].attrs['reference']
-    Wav=File[data_path].attrs['wavelengths']
+    else:
+        pass
+
     spe=(data-bgd)/(ref-bgd)
     i_0=np.argmin(abs(Wav-x_lim[0]))
     i_1=np.argmin(abs(Wav-x_lim[1]))
+    if z_scan:
+        Wav, spe = Wav[i_0:i_1], spe[i_0:i_1]
+    else:
+        Wav, spe = Wav[i_0:i_1], spe[:,i_0:i_1]
 
-    return Wav[i_0:i_1], spe[i_0:i_1]
+    return Wav, spe
 
 def DF_spe_sorting_trandor(Wav, File_path, DF_path, ref_path, bgd_ref_path, bgd_path, x_range=[550,1000],notch_region=[617,644,764,794], plot=False,compare=False):
     index_0=np.argmin(abs(x_range[0]-Wav))
@@ -244,10 +273,14 @@ def Output_data_random(File_path, data_path,DC=0, plot=False, laser='',offset=0)
         Spe=[]
         Spe_plot=[]
         for i in data_path:
-            Wav=File[i].attrs['wavelengths']
+            try:
+                Wav=File[i].attrs['wavelengths']
+            except:
+                raise Exception('Remember to make data_path a list')
             data=np.asarray(File[i])
             shape=len(np.shape(data))
-            if Wav[0] > Wav[1]:
+
+            if Wav[0] > Wav[-1]:
                 Wav=np.flipud(Wav)
                 if shape == 2:
                     data=np.fliplr(data)
@@ -322,6 +355,40 @@ def plt_DF_PL_bgd(File_path='',data_path_DF='',data_path_PL='',data_path_PL_bgd=
         plt.savefig(name+'.jpg',dpi=300)
     return Wav_PL, data_PL_ave, data_PL_bgd
 
+def plt_DF_PL_trandor(File_path='',data_path_DF='',data_path_PL='',data_path_PL_bgd='',Wav_PL='',PL_exp=1,power=1,mg=1,name=''):
+    with h5py.File(File_path, 'r') as File:
+        Wav=File[data_path_DF].attrs['wavelengths']
+        bgd=File[data_path_DF].attrs['background']
+        ref=File[data_path_DF].attrs['reference']
+        i_500=np.argmin(abs(Wav-450))
+        i_505=np.argmin(abs(Wav-505))
+        i_950=np.argmin(abs(Wav-900))
+        i_900=np.argmin(abs(Wav-900))
+        data_DF=np.max(File[data_path_DF],axis=0)
+        data_DF=(data_DF-bgd)/(ref-bgd)*100
+        DF_spe=data_DF[i_500:i_950]
+        Wav_DF=Wav[i_500:i_950]
+        data_PL_bgd=np.mean(File[data_path_PL_bgd],axis=0)
+
+        data_PL=np.asarray(File[data_path_PL])
+        data_PL_ave=(data_PL-data_PL_bgd)/PL_exp/power
+        data_PL_ave=np.flipud(data_PL_ave)*mg
+
+    pf.plt_plot(Wav_DF,DF_spe,figsize=[9,6])
+    plt.xlabel('Wavelength / nm')
+    plt.ylabel('Scattering intensity (%)')
+    plt.yticks([0,1])
+    plt.twinx()
+    pf.plt_plot([],[], new_fig=False)
+    plt.plot(Wav_PL,data_PL_ave,linewidth=3, color='C3',zorder=-10)
+    plt.ylabel('Intensity (x $10^3$ cts/mW/s)',fontsize=20)
+    plt.tick_params(labelsize=20, right=True)
+    plt.subplots_adjust(top=0.98,bottom=0.115,left=0.095,right=0.89,hspace=0.2,wspace=0.2)
+    
+    if name != '':
+        plt.savefig(name+'.jpg',dpi=300)
+    return Wav_PL, data_PL_ave
+
 def plt_DF_PL(File_path='',data_path_DF='',data_path_PL='',Spe=-1,PL_exp=1,power=1,mg=1,ylim=[],name='',plot=True, PL_range=[]):
     with h5py.File(File_path, 'r') as File:
         Wav=File[data_path_DF].attrs['wavelengths']
@@ -344,7 +411,7 @@ def plt_DF_PL(File_path='',data_path_DF='',data_path_PL='',Spe=-1,PL_exp=1,power
         data_PL=data_PL[i_550:i_750]*mg
         Wav_PL=Wav[i_550:i_750]
     if plot:
-        pf.plt_plot(Wav_DF,DF_spe,figsize=[9,6])
+        pf.plt_plot(Wav_DF,DF_spe,figsize=[9,6],label_s=16)
         plt.xlabel('Wavelength / nm')
         plt.ylabel('Scattering intensity (%)')
         plt.twinx()
@@ -444,6 +511,71 @@ def wavelengths_cal(x, standard_peaks,measure_peaks, laser=633):
     else:
         Wav_cal=1/(1/laser-rf_cal_1/(10**7))
         return Wav_cal, rf_cal_1 # return the calibrated Ramanshift 
+
+def butterLowpassFiltFilt(data, cutoff = 1500, fs = 60000, order=1):
+    '''Smoothes data without shifting it'''
+    nyq = 0.5 * fs
+    normalCutoff = cutoff / nyq
+    b, a = butter(order, normalCutoff, btype='low', analog=False)
+    yFiltered = filtfilt(b, a, data)
+    return yFiltered
+
+def reduceNoise(y, factor = 10, cutoff = 1500, fs = 60000, pl = False):
+
+    if pl == True:
+        ySmooth = sgFilt(y, window_length = 221, polyorder = 7)
+
+    ySmooth = butterLowpassFiltFilt(y, cutoff = cutoff, fs = fs)
+    yNoise = y - ySmooth
+    yNoise /= factor
+    y = ySmooth + yNoise
+    return y
+
+
+def td_calibration (File_path=[], data_path=[], spe_range=[510,1050], peaks_oo_remove=[627], peaks_td_remove=[], check=False):
+
+    print('File path 1 is for trandor; File path 2 is for Ocean Optic')
+    Wav_oo, data_oo, Spe_oo = Output_data_random(File_path[0], data_path[0],DC=0, plot=False, laser='',offset=0)
+    Wav_td, data_td, Spe_td = Output_data_random(File_path[1], data_path[1],DC=0,plot=False, laser='',offset=0)
+    
+    if Wav_oo[1]< Wav_oo[0]:
+        Wav_oo=np.fliplr(Wav_oo)
+    if Wav_td[1]< Wav_td[0]:
+        Wav_td=np.fliplr(Wav_td)
+    
+    index_0 = np.argmin(abs(Wav_oo - spe_range[0]))
+    index_1 = np.argmin(abs(Wav_oo - spe_range[1]))
+    Wav_oo=Wav_oo[index_0:index_1]
+    Spe_oo= Spe_oo[index_0:index_1]
+
+    Spe_td = Normalize_mean(Spe_td)
+    Spe_td_sms= reduceNoise(Spe_td)
+    x_td, y_td, peaks_td= Find_Peaks( Wav_td, Spe_td_sms, width=3,prominence=0.005,distance=100,check=False)
+    x_oo, y_oo, peaks_oo= Find_Peaks(Wav_oo, Normalize_mean(Spe_oo), width=3,prominence=0.002,distance=100,check=False)
+    
+    if peaks_oo_remove != []:
+        index_oo=[np.argmin(abs(peaks_oo-i)) for i in peaks_oo_remove]
+        peaks_std = [j for i,j in enumerate(peaks_oo) if i not in index_oo]
+    else:
+        peaks_std = peaks_oo
+    
+    if peaks_td_remove != []:
+        index_td=[np.argmin(abs(peaks_td-i)) for i in peaks_td_remove]
+        peaks_measure = [j for i,j in enumerate(peaks_td) if i not in index_td]
+    else:
+        peaks_measure = peaks_td
+
+    if check:
+        Check_Peaks(x_td, y_td, peaks_td)
+        Check_Peaks(x_oo, y_oo, peaks_std)
+
+    Wav_cal  = wavelengths_cal(Wav_td, peaks_std, peaks_measure, laser='')
+    plt.subplots()
+    plt.plot(Wav_cal, Spe_td)
+    plt.plot(Wav_oo, Normalize_mean(Spe_oo))
+
+    return Wav_cal
+
 
 def DF_SERS_correlation (Wav_DF, Spe_DF, Wav_SERS_633, Spe_SERS_633, Wav_SERS_785, Spe_SERS_785,mg_633=1,mg_785=1,label_s=22, fill=True,xlim=[600,900], colormap='Blues'):
     colors=pf.color_segmentation(color_name=colormap, steps=12)
@@ -595,7 +727,10 @@ def plt_z_shift(Wav,  data, x_cut=[450,1000],xlim=[500,950],ylim=[0,0],name='',l
     if return_df:
         return Wav, np.max(data,axis=0)
 
-def Gaussian(x,data,R_TH=0.5,check=False):
+def gaussian(x, amp, sigma, cen):
+    return amp/(sigma*np.sqrt(2*3.14)) * (np.exp(-(x-cen)**2 / (2*(sigma)**2)))
+
+def Gaussian(x,data,R_TH=0.5,check=False, extend=False):
 
     GM=GaussianModel(prefix='Gaussian_')
     pars=GM.guess(data,x=x)
@@ -608,12 +743,16 @@ def Gaussian(x,data,R_TH=0.5,check=False):
     fwhm = out.params['Gaussian_fwhm'].value
     stderr_fwhm = out.params['Gaussian_fwhm'].stderr
     sigma = out.params['Gaussian_sigma'].value
+    amp = out.params['Gaussian_amplitude'].value
     height= out.params['Gaussian_height'].value
     stderr_ht = out.params['Gaussian_height'].stderr
     correlation_matrix = np.corrcoef(data, out.best_fit)
     correlation = correlation_matrix[0,1]
     R_squared = correlation**2
-    
+
+    x_new = np.linspace(np.min(x), np.max(x),500)
+    y_new = gaussian(x_new, amp, sigma, resonance)
+    extend_data=[x_new, y_new]
     if check:
         plt.subplots()
         plt.plot(x,data)
@@ -622,7 +761,8 @@ def Gaussian(x,data,R_TH=0.5,check=False):
 
     if R_squared < R_TH or out.success == False:
         raise Exception('Fitting fails or R-square is below 0.5 !')
-    res ={'Intensity': height,'Intensity_error': stderr_ht,'Position':resonance, 'Position_error':stderr_res, 'Fitted curve':out.best_fit}
+    res ={'Intensity': height,'Intensity_error': stderr_ht,'Position':resonance, 'Position_error':stderr_res,
+          'fwhm':fwhm,'Fitted curve':out.best_fit, 'Extending curve':extend_data}
 
     return res
 
