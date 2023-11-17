@@ -543,10 +543,11 @@ def td_calibration (File_path=[], data_path=[], spe_range=[510,1050], peaks_oo_r
     if Wav_td[1]< Wav_td[0]:
         Wav_td=np.fliplr(Wav_td)
     
-    index_0 = np.argmin(abs(Wav_oo - spe_range[0]))
-    index_1 = np.argmin(abs(Wav_oo - spe_range[1]))
-    Wav_oo=Wav_oo[index_0:index_1]
-    Spe_oo= Spe_oo[index_0:index_1]
+    if spe_range != []:
+        index_0 = np.argmin(abs(Wav_oo - spe_range[0]))
+        index_1 = np.argmin(abs(Wav_oo - spe_range[1]))
+        Wav_oo=Wav_oo[index_0:index_1]
+        Spe_oo= Spe_oo[index_0:index_1]
 
     Spe_td = Normalize_mean(Spe_td)
     Spe_td_sms= reduceNoise(Spe_td)
