@@ -573,8 +573,10 @@ def td_calibration (File_path=[], data_path=[], spe_range=[510,1050], peaks_oo_r
     plt.subplots()
     plt.plot(Wav_cal, Spe_td)
     plt.plot(Wav_oo, Normalize_mean(Spe_oo))
+    
+    res= {'Standard peaks': peaks_std, 'Measured peaks': peaks_td}
 
-    return Wav_cal
+    return Wav_cal, res
 
 
 def DF_SERS_correlation (Wav_DF, Spe_DF, Wav_SERS_633, Spe_SERS_633, Wav_SERS_785, Spe_SERS_785,mg_633=1,mg_785=1,label_s=22, fill=True,xlim=[600,900], colormap='Blues'):
