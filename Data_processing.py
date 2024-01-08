@@ -534,7 +534,7 @@ def reduceNoise(y, factor = 10, cutoff = 1500, fs = 60000, pl = False):
 
 def td_calibration (File_path=[], data_path=[], spe_range=[510,1050], peaks_oo_remove=[627], peaks_td_remove=[], check=False):
 
-    print('File path 1 is for trandor; File path 2 is for Ocean Optic')
+    print('File path 1 is for Ocean optics; File path 2 is for Trandor')
     Wav_oo, data_oo, Spe_oo = Output_data_random(File_path[0], data_path[0],DC=0, plot=False, laser='',offset=0)
     Wav_td, data_td, Spe_td = Output_data_random(File_path[1], data_path[1],DC=0,plot=False, laser='',offset=0)
     
