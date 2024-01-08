@@ -567,7 +567,7 @@ def td_calibration (File_path=[], data_path=[], spe_range=[510,1050], peaks_oo_r
         peaks_measure = peaks_td
 
     if check:
-        Check_Peaks(x_td, y_td, peaks_td)
+        Check_Peaks(x_td, y_td, peaks_measure)
         Check_Peaks(x_oo, y_oo, peaks_std)
 
     Wav_cal  = wavelengths_cal(Wav_td, peaks_std, peaks_measure, laser='')
